@@ -4,16 +4,16 @@ library(parallel)
 library(dplyr)
 library(MASS)
 
-numCores <- detectCores() - 1
-cl <- makeCluster(numCores)
+# numCores <- detectCores() - 1
+cl <- makeCluster(45)
+result_list = list()
+boot_list = list()
 
-tau_power_score_fun <- function(num) {
-  
+please <- function(num) {
+  # for(num in 2:15){
   library(dplyr)
   library(MASS)
-  
-  
-  RBNBZI <- function(n, b10, b11, b20, b21, gam10, gam11, w, tau1, tau2, grid = 20) {
+  RBZI <- function(n, b10, b11, b20, b21, gam10, gam11, w, grid = 20) {
     
     find_idx <- function(mat) {
       if(sum(mat) == 0){
@@ -39,14 +39,14 @@ tau_power_score_fun <- function(num) {
     mu2 <- exp(x2 %*% c(b20, b21));
     phi <- exp(z %*% c(gam10, gam11)) / (1 + exp(z %*% c(gam10, gam11)))
     
-    c1 <- (1 + d * mu1 * tau1)^{-1/tau1}
-    c2 <- (1 + d * mu2 * tau2)^{-1/tau2}
+    c1 <- exp(-d * mu1);
+    c2 <- exp(-d * mu2);
     
     y <- matrix(0, nrow = n, ncol = 2)
     
     for (i in 1:n) {
-      PX <- cbind(dnbinom(0:(grid - 1), mu = mu1[i], size = 1/tau1), dnbinom(0:(grid - 1), mu = mu2[i], size = 1/tau2))
-      PTMPY <- cbind(exp(-(0:(grid - 1))) - (1 + d * mu1[i] * tau1)^{-1/tau1}, exp(-(0:(grid - 1))) - (1 + d * mu2[i] * tau2)^{-1/tau2})
+      PX <- cbind(dpois(0:(grid - 1), lambda = mu1[i]), dpois(0:(grid - 1), lambda = mu2[i]))
+      PTMPY <- cbind(exp(-(0:(grid - 1))) - exp(-d * mu1[i]), exp(-(0:(grid - 1))) - exp(-d * mu2[i]))
       
       TXY = matrix(PX[, 1], nrow = grid, ncol = 1) %*% matrix(PX[, 2], nrow = 1, ncol = grid)  * 
         (1 + w * matrix(PTMPY[, 1], nrow = grid, ncol = 1) %*% matrix(PTMPY[, 2], nrow = 1, ncol = grid))
@@ -67,7 +67,7 @@ tau_power_score_fun <- function(num) {
     return(list(y = y, x1 = x1, x2 = x2, z = z, c1 = c1, c2 = c2))
   }
   
-  logL_H0 <- function(param) {
+  logL <- function(param) {
     beta1 <- param[c(1, 2)]
     beta2 <- param[c(3, 4)]
     gamma <- param[c(5, 6)]
@@ -77,81 +77,48 @@ tau_power_score_fun <- function(num) {
     y <- sample_data$y; x1 <- sample_data$x1; x2 <- sample_data$x2; z <- sample_data$z
     
     mu1 <- c(exp(x1 %*% beta1)); mu2 <- c(exp(x2 %*% beta2))
-    c1 <- exp(-d * mu1); c2 <- exp(-d * mu2)
+    c1 <- exp(mu1 * exp(-1) - mu1); c2 <- exp(mu2 * exp(-1) - mu2)
     
     phi <- c(exp(z %*% gamma) / (1 + exp(z %*% gamma)))
     zg <- c(exp(z %*% gamma))
     ind <- (y[, 1] == 0 & y[, 2] == 0)
     
-    v1 <- sum(log(exp(z %*% gamma) + dpois(0, lambda = mu1) * dpois(0, lambda = mu2) * (1 + w * (1 - c1) * (1 - c2))) * ind)
+    v1 <- sum(log(exp(z %*% gamma) + dpois(x = 0, lambda = mu1) * dpois(x = 0, lambda = mu2) * (1 + w * (1 - c1) * (1 - c2))) * ind)
+    
     v21 <- (dpois(x = y[, 1], lambda = mu1, log = T) + dpois(x = y[, 2], lambda = mu2, log = T)) * !ind
     v22 <- c((1 + w * (exp(-y[, 1]) - c1) * (exp(-y[, 2]) - c2)) * !ind)
     v22 <- ifelse(v22 <= 0, log(1e-15), log(v22)) * !ind
-    
     v2 <- (v21 + v22)*!ind
     logbp <- sum(v1) + sum(v2) - sum(log(1+exp(z %*% gamma)))
     
     return(-logbp)
   }
-  logL_H1 <- function(param) {
-    beta1 <- param[c(1, 2)]
-    beta2 <- param[c(3, 4)]
-    gamma <- param[c(5, 6)]
-    tau <- param[c(7, 8)]
-    w <- param[9]
-    
-    d <- 1 - exp(-1)
-    y <- sample_data$y; x1 <- sample_data$x1; x2 <- sample_data$x2; z <- sample_data$z
-    
-    mu1 <- c(exp(x1 %*% beta1)); mu2 <- c(exp(x2 %*% beta2))
-    c1 <- (1 + d * mu1 * tau[1])^{-1/tau[1]}; c2 <- (1 + d * mu2 * tau[2])^{-1/tau[2]}
-    
-    phi <- c(exp(z %*% gamma) / (1 + exp(z %*% gamma)))
-    zg <- c(exp(z %*% gamma))
-    ind <- (y[, 1] == 0 & y[, 2] == 0)
-    
-    v1 <- sum(log(exp(z %*% gamma) + dnbinom(0, mu = mu1, size = 1/tau[1]) * dnbinom(0, mu = mu2, size = 1/tau[2]) * (1 + w * (1 - c1) * (1 - c2))) * ind)
-    
-    v21 <- (dnbinom(x = y[, 1], mu = mu1, size = 1/tau[1], log = T) + dnbinom(x = y[, 2], mu = mu2, size = 1/tau[2], log = T)) * !ind
-    v22 <- c((1 + w * (exp(-y[, 1]) - c1) * (exp(-y[, 2]) - c2)) * !ind)
-    v22 <- ifelse(v22 <= 0, log(1e-15), log(v22)) * !ind
-    v2 <- (v21 + v22)*!ind
-    logbp <- sum(v1) + sum(v2) - sum(log(1+exp(z %*% gamma)))
-    
-    return(-logbp)
-  }
+  
   
   ## Iteration
+  # i = 1
   iteration = 1000
+  result <- result2 <- modify_result <- c()
+  boot_cric <- matrix(0, iteration, 4)
   
-  result <- matrix(0, nrow = 1000, ncol = 3)
-  
-  n_grid <- c(200, 500)
-  tau1_grid <- c(1e-10)
-  tau2_grid <- c(1e-10, 0.025, 0.05, 0.1, 0.2, 0.4)
-  phi_grid <- c(-0.997, 0.352)
+  n_grid <- c(100, 200, 500)
+  g2_grid <- c(-0.997, -0.186, 0.352, 0.794, 1.20)
   w_grid <- c(-1, 0, 1)
   
-  param_grid <- expand.grid(w_grid, phi_grid, tau2_grid, tau1_grid, n_grid)
-  
+  param_grid <- expand.grid(w_grid, g2_grid, n_grid)
+  param_est <- matrix(0, iteration, 7)
   for(i in 1:iteration) {
     set.seed(i)
-    sample_data <- RBNBZI(n = param_grid[num, 5], .2, .4, .4, .8, -1.2, param_grid[num, 2], 
-                          w = param_grid[num, 1], tau1 = param_grid[num, 4], tau2 = param_grid[num, 3])
+    sample_data <- RBZI(n = param_grid[num, 3], .2, .4, .4, .8, -1.2, param_grid[num, 2], param_grid[num, 1])
     
-    one <- try(optim(par = rep(0, 7), fn = logL_H0, lower = c(rep(-5, 6), -10), method = "L-BFGS-B"), silent = TRUE)
-    two <- try(optim(par = rep(0, 9), fn = logL_H1, lower = c(rep(-5, 6), 1e-10, 1e-10, -10), method = "L-BFGS-B"), silent = TRUE)
+    one <- try(optim(par = rep(0, 7), logL, method = "L-BFGS-B"), silent = TRUE)
     
-    if (class(one) == "try-error" | class(two) == "try-error") {
+    if (class(one) == "try-error") {
       next
-    } 
-    
-    param <- one$par
-    
-    ## LR-test
-    L0val <- one$value
-    L1val <- two$value
-    LR <- 2 * (L0val - L1val)
+    } else {
+      param <- one$par
+      param_est[i,] <- param
+    }
     
     beta_i <- param[c(1, 3)]
     beta_c <- param[c(2, 4)]
@@ -216,6 +183,7 @@ tau_power_score_fun <- function(num) {
       }
       return (sv)
     })
+    
     a2 = sapply(1:nrow(y), function(i){ 
       sv = 0
       if(y[i, 2] > 0){
@@ -246,120 +214,87 @@ tau_power_score_fun <- function(num) {
                   colSums(gr_df * dbeta11),
                   colSums(gr_df * dbeta20),
                   colSums(gr_df * dbeta21),
-                  colSums(gr_df * dw)), 9, 9)
+                  colSums(gr_df * dw)), 9, 9) 
+    
+    EI <- I / param_grid[num, 3]
+    
     
     score <- colSums(gr_df)
-    King_score <- colSums(gr_df)
     
-    score[1:2] <- ifelse(score[1:2] <= 0, 0, score[1:2])
-    score_zero <- t(score) %*% MASS::ginv(I) %*% score
+    sing <- try(ginv(I), silent = TRUE)
+    sing2 <- try(ginv(EI), silent = TRUE)
     
-    ## King & Wu test
-    J <- MASS::ginv(I)[1:2, 1:2]
+    if (class(sing)[[1]] == "try-error") {
+      next
+    } else {
+      
+    }
+    
+    if (class(sing2)[[1]] == "try-error") {
+      next
+    } else {
+      
+    }
+    
+    result[i] <- t(score) %*% ginv(I) %*% score
+    
+    score2 <- score
+    score2[1:2] <- ifelse(score2[1:2] < 0, 0, score[1:2])
+    result2[i] <- t(score2) %*% ginv(I) %*% score2
+    
+    sum_score <- sum(score[1:2])
+    # V <- I[1:2,1:2] / param_grid[num, 3]
+    
+    inv_EI <- ginv(I)[1:2,1:2]  ## J''
     ell <- rep(1, 2)
-    JJ <- sqrt(c(t(ell) %*% MASS::ginv(J) %*% ell))
-    King <- sum(King_score[1:2]) / JJ
-    
-    ## Result-Store
-    
-    result[i, 1] <- LR
-    result[i, 2] <- score_zero
-    result[i, 3] <- King
+    variance <- sqrt(c(t(ell) %*% ginv(inv_EI) %*% ell))
+    modify_result[i] <- sum_score/variance
+    if (i %% 100 == 0) print(i)
   }
-  return(result)
+
+  return(list(result, result2, modify_result))
+  # return (result)
 }
 
-tau_power_score <- parLapply(cl, X = 1:72, tau_power_score_fun)
+
+tau_result_list1000 <- parLapply(cl, X = 1:45, please)
+tau_result_list
 stopCluster(cl)
 
 
-#####################################################
-
-load("C:/Users/jieun/Dropbox/BZINB/zero-zero/graph/tau_power_score.RData")
-
-n_grid <- c(200, 500)
-tau1_grid <- c(1e-10)
-tau2_grid <- c(1e-10, 0.025, 0.05, 0.1, 0.2, 0.4)
-phi_grid <- c(-0.997, 0.352)
-pp_grid <- c(0.1, 0.4)
+## 결과
+n_grid <- c(100, 200, 500)
+phi_grid <- c(0.1, 0.2, 0.3, 0.4, 0.5)
 w_grid <- c(-1, 0, 1)
 
-param_grid <- expand.grid(w_grid, phi_grid, tau2_grid, tau1_grid, n_grid)
+param_grid <- expand.grid(w_grid, phi_grid, n_grid)
 
-qval = c(0.05)
+qval = c(0.1, 0.05)
 upp = qchisq(qval, 2, lower.tail = F)/4 + qchisq(qval, 1, lower.tail = F)/2
-kupp <- qnorm(1-qval)
+upp = qchisq(qval, 2, lower.tail = F)
+result_list[[1]]$result
+upp = qnorm(1-qval)
 
-
-# Open PNG file for writing
-tiff('tau_power.tif', units = "px", res = 300, width = 2600, height = 1500)
-
-# Set the outer margin
-par(oma = c(0, 0, 0, 0))
-
-# Set the inner margin
-par(mar = c(5, 4, 4, 2) + 0.1)
-
-
-par(mfrow = c(2, 3))
-
-kk = 0
-pn = 0
-for(pp in phi_grid){
-  pn = pn + 1
-  for(ww in w_grid){
-    kk = kk + 1
-    
-    out <- data.frame(n = rep(0, 12), tau2 = rep(0, 12), LR = rep(0, 12), score = rep(0, 12))
-    
-    # Score_mixed 결과
-    k = 0
-    for(ii in 1:72){
-      if(param_grid[ii, 2] == pp & param_grid[ii, 1] == ww){  ## tau1 조정
-        cat("n =", param_grid[ii, 5], "tau1 =", param_grid[ii, 4], "tau2 =", param_grid[ii, 3], "w =", param_grid[ii, 1], '\n')
-        k = k + 1
-        out$n[k] <- param_grid[ii, 5]
-        out$tau2[k] <- param_grid[ii, 3]
-        out$LR[k] <- round(mean(tau_power_score[[ii]][, 1] >= upp, na.rm = T), 3)
-        out$score[k] <- round(mean(tau_power_score[[ii]][, 3] >= kupp, na.rm = T), 3)
-      }
-    }
-    
-    # if(ww == -1.5){
-    #   out_full <- out  
-    # } else{
-    #   out_full <- rbind(out_full, out)
-    # }
-    print(out$score_zero[1])
-    
-    # 그림 그리기
-    # n=200, LR
-    plot(out$tau2[out$n == 500], out$LR[out$n == 500], lty = 1, type = 'l', col = 'darkgray',
-         xlab = expression(tau[2]), ylab = "estimated power", main = bquote(phi == .(pp_grid[pn])  ~ ", " ~ w == .(ifelse(ww == 0, 0, ww))), ylim = c(0, 1))
-    points(out$tau2[out$n == 500], out$LR[out$n == 500], lty = 1, lwd = 1, pch = 15, col = 'darkgray')
-    
-    # n=100, LR
-    points(out$tau2[out$n == 200], out$LR[out$n == 200], lty = 2, type = 'l', col = 'darkgray',
-           xlab = expression(tau[2]), ylab = "estimated power")
-    points(out$tau2[out$n == 200], out$LR[out$n == 200], lty = 2, lwd = 1, pch = 15, col = 'darkgray')
-    
-    # n=200, score
-    points(out$tau2[out$n == 500], out$score[out$n == 500], lty = 1, type = 'l', col = 'black',
-           xlab = expression(tau[2]), ylab = "estimated power")
-    points(out$tau2[out$n == 500], out$score[out$n == 500], lwd = 1, pch = 16, col = 'black')
-    
-    # n=100, score
-    points(out$tau2[out$n == 200], out$score[out$n == 200], lty = 2, type = 'l', col = 'black',
-           xlab = expression(tau[2]), ylab = "estimated power")
-    points(out$tau2[out$n == 200], out$score[out$n == 200], lty = 2, lwd = 1, pch = 16, col = 'black')
-    
-    abline(h = 0.05)
-    
-    if(kk == 6)
-      legend("bottomright", legend = c('n=500, score', 'n=200, score', 'n=500, LR', 'n=200, LR'),
-             col = c("black", "black", "darkgray","darkgray"), lty = c(1, 3, 1, 3), lwd = rep(1, 4),
-             pch = c(16, 16, 15, 15))
-    
+# 스코어 결과
+for(ii in 1:45){
+  cat("n =", param_grid[ii, 3], "gam2 =", param_grid[ii, 2], "w =", param_grid[ii, 1], '\n')
+  for(qq in 1:2){
+    cat("true q = ", qval[qq], "estimated prob =", round(mean(tau_result_list10000[[ii]][[3]]>= upp[qq], na.rm = T), 3), '\n')
   }
 }
-dev.off()
+
+
+#histogram
+id = c(16, 19, 22, 25, 28, 31, 34, 37, 40, 43)
+par(mfrow=c(2,5))
+for(ii in id){
+  y = tau_result_list1000[[ii]][[3]]
+  qqplot(qnorm(ppoints(500)), y, main = paste0("n=", param_grid[ii,3], ", tau2=", param_grid[ii,2], ", w=", param_grid[ii,1]), ylab = 'Simulated score tests', xlab = 'N(0,1) quantiles')
+  qqline(y, distribution = function(p) qnorm(p), probs = c(0.001, 0.999), col = 2)
+}
+
+
+###################
+
+save(result_list, file = "~/tau_modify_score10000.RData")
+load("~/tau_modify_score_n50.RData")
