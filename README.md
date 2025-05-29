@@ -1,12 +1,21 @@
-# BZINB 
+# BZINB
 
-This is a new model called Bivariate Zero-inflated Negative binomial regression model. This model was first proposed by Faroughi, P., & Ismail, N. (2017) and constructed under Sarmanov family of distribution. We derived a score test for zero-inflation, overdispersion, independence, and dependency parameter.
+The **Bivariate Zero-Inflated Negative Binomial (BZINB)** regression model, proposed by Faroughi & Ismail (2017), handles bivariate count data with both zero inflation and overdispersion. We derive score tests for zero-inflation, overdispersion, marginal independence, and dependence.
 
-* **D. M. Jang, J. E. Shin**, B. C. Jung*. Score tests for overdispersions in a bivariate zero-inflated negative binomial regression model. *Journal of the Korean Statistical Society*, 2025. (in press)
+## Publications
 
-* Score tests for overdispersions in a bivariate zero-inflated negative binomial regression model, *The Korean Data Analysis Society*, 2024.01 (Presented by **J. E. Shin**)
+- **D. M. Jang, J. E. Shin**, B. C. Jung\*  
+  _Score tests for overdispersions in a bivariate zero-inflated negative binomial regression model_,  
+  *Journal of the Korean Statistical Society*, 2025 (in press)
 
----
-### reference
+- **J. E. Shin**, D. M. Jang, B. C. Jung  
+  _Score tests for overdispersions in a bivariate zero-inflated negative binomial regression model_,  
+  *The Korean Data Analysis Society*, 2024.01 (Presented by **J. E. Shin**)
 
-Faroughi, P., & Ismail, N. (2017). Bivariate zero-inflated negative binomial regression model with applications. *Journal of Statistical Computation and Simulation*, 87(3), 457-477.
+## Reference
+
+Faroughi, P., & Ismail, N. (2017).  
+_Bivariate zero-inflated negative binomial regression model with applications_.  
+*Journal of Statistical Computation and Simulation*, 87(3), 457–477.
+
+\* Corresponding author
