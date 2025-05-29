@@ -5,10 +5,10 @@ The **Bivariate Zero-Inflated Negative Binomial (BZINB)** regression model, prop
 ## Publications
 
 - **D. M. Jang, J. E. Shin**, B. C. Jung\*  
-  _Score tests for overdispersions in a bivariate zero-inflated negative binomial regression model_,  
+  _Score tests for a bivariate zero-inflated negative binomial regression model_,  
   *Journal of the Korean Statistical Society*, 2025 (in press)
 
-- **J. E. Shin**, D. M. Jang, B. C. Jung\* 
+- **J. E. Shin**, D. M. Jang, B. C. Jung\*  
   _Score tests for overdispersions in a bivariate zero-inflated negative binomial regression model_,  
   *The Korean Data Analysis Society*, 2024.01 (Presented by **J. E. Shin**)
 
