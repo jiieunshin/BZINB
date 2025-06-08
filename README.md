@@ -4,11 +4,9 @@ This study models overdispersed zero-inflated bivariate coefficient data based o
 
 ## Publications
 
-- **D. M. Jang, J. E. Shin**, B. C. Jung\*  
-  **Jang, D., & Shin, J.** (2025). Score tests for bivariate zero-inflated negative binomial regression model. *Journal of the Korean Statistical Society*, 1-26.
+- **Jang, D., & Shin, J.** (2025). Score tests for bivariate zero-inflated negative binomial regression model. *Journal of the Korean Statistical Society*, 1-26.
 
-- **J. E. Shin**, D. M. Jang, B. C. Jung\*  
-  **신지은, 장동민,** & 정병철. (2023). 제로팽창 이변량 음이항 회귀모형에서 산포모수에 대한 가설검정. *한국자료분석학회 학술대회자료집*, 2024(1), 101-101. (Presented by **J. E. Shin**)
+- **신지은, 장동민,** & 정병철. (2023). 제로팽창 이변량 음이항 회귀모형에서 산포모수에 대한 가설검정. *한국자료분석학회 학술대회자료집*, 2024(1), 101-101. (Presented by **J. E. Shin**)
 
 \* Corresponding author
 
